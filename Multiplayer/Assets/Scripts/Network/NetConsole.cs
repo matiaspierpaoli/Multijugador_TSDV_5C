@@ -1,15 +1,14 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using UnityEngine;
 using System.Text;
 
-public class NetConsole : MonoBehaviour
+public class NetConsole : IMessage<string>
 {
     public string consolemessage;
 
-    public NetConsole()
+    public NetConsole(byte[] data)
     {
+        Deserialize(data);
     }
 
     public NetConsole(string consoleMessage)
@@ -17,13 +16,18 @@ public class NetConsole : MonoBehaviour
         this.consolemessage = consoleMessage;
     }
 
-    public string Deserialize(byte[] message)
+    private void Deserialize(byte[] message) 
     {
-        string outData;
+        //consolemessage = System.Text.Encoding.UTF8.GetString(message);
 
-        outData = BitConverter.ToString(message, 4);
+        char[] charArray = new char[message.Length - 4];
 
-        return outData;
+        for (int i = 0; i < message.Length - 4; i++)
+        {
+            charArray[i] = (char)message[i + 4];
+        }
+
+        consolemessage = new string(charArray);
     }
 
     public MessageType GetMessageType()
@@ -39,5 +43,10 @@ public class NetConsole : MonoBehaviour
         outData.AddRange(Encoding.ASCII.GetBytes(consolemessage));
 
         return outData.ToArray();
+    }
+
+    string IMessage<string>.Deserialize(byte[] message)
+    {
+        throw new NotImplementedException();
     }
 }

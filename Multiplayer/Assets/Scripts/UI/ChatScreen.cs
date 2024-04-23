@@ -42,8 +42,8 @@ public class ChatScreen : MonoBehaviourSingleton<ChatScreen>
             case MessageType.HandShake:
                 break;
             case MessageType.Console:
-                NetConsole netConsoleMessage = new NetConsole();
-                messages.text += netConsoleMessage.Deserialize(data) + System.Environment.NewLine;
+                NetConsole netConsoleMessage = new NetConsole(data);
+                messages.text += netConsoleMessage.consolemessage + System.Environment.NewLine;
                 break;
             case MessageType.Position:
                 break;
