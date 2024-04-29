@@ -3,20 +3,6 @@ using System.Collections.Generic;
 using System.Net;
 using UnityEngine;
 
-public struct Client
-{
-    public float timeStamp;
-    public int id;
-    public IPEndPoint ipEndPoint;
-
-    public Client(IPEndPoint ipEndPoint, int id, float timeStamp)
-    {
-        this.timeStamp = timeStamp;
-        this.id = id;
-        this.ipEndPoint = ipEndPoint;
-    }
-}
-
 public class NetworkManager : MonoBehaviourSingleton<NetworkManager>, IReceiveData
 {
     public IPAddress ipAddress
@@ -43,7 +29,7 @@ public class NetworkManager : MonoBehaviourSingleton<NetworkManager>, IReceiveDa
     private readonly Dictionary<int, Client> clients = new Dictionary<int, Client>();
     private readonly Dictionary<IPEndPoint, int> ipToId = new Dictionary<IPEndPoint, int>();
 
-    int clientId = 0; // This id should be generated during first handshake
+    public int clientId = 0;
 
     public void StartServer(int port)
     {
@@ -61,10 +47,11 @@ public class NetworkManager : MonoBehaviourSingleton<NetworkManager>, IReceiveDa
 
         connection = new UdpConnection(ip, port, this);
 
-        AddClient(new IPEndPoint(ip, port));
+        NetHandShake netHandshake = new NetHandShake();
+        SendToServer(netHandshake.Serialize());
     }
 
-    void AddClient(IPEndPoint ip)
+    public int AddClient(IPEndPoint ip)
     {
         if (!ipToId.ContainsKey(ip))
         {
@@ -77,6 +64,7 @@ public class NetworkManager : MonoBehaviourSingleton<NetworkManager>, IReceiveDa
 
             clientId++;
         }
+        return ipToId[ip];
     }
 
     void RemoveClient(IPEndPoint ip)
@@ -99,6 +87,11 @@ public class NetworkManager : MonoBehaviourSingleton<NetworkManager>, IReceiveDa
     public void SendToServer(byte[] data)
     {
         connection.Send(data);
+    }
+
+    public void SendToClient(byte[] data, IPEndPoint ip)
+    {
+        connection.Send(data, ip);
     }
 
     public void Broadcast(byte[] data)
