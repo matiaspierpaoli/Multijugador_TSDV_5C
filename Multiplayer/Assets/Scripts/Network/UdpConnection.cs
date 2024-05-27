@@ -11,12 +11,14 @@ public class UdpConnection
         public IPEndPoint ipEndPoint;
     }
 
+    public int playerId = -1;
+    public string nameTag;
+
     private readonly UdpClient connection;
     private IReceiveData receiver = null;
     private Queue<DataReceived> dataReceivedQueue = new Queue<DataReceived>();
 
     object handler = new object();
-    
     public UdpConnection(int port, IReceiveData receiver = null)
     {
         connection = new UdpClient(port);
@@ -26,7 +28,7 @@ public class UdpConnection
         connection.BeginReceive(OnReceive, null);
     }
 
-    public UdpConnection(IPAddress ip, int port, IReceiveData receiver = null)
+    public UdpConnection(IPAddress ip, int port, string tag, IReceiveData receiver = null)
     {
         connection = new UdpClient();
         connection.Connect(ip, port);
@@ -34,6 +36,9 @@ public class UdpConnection
         this.receiver = receiver;
 
         connection.BeginReceive(OnReceive, null);
+
+        ClientToServerHS handShake = new ClientToServerHS(tag);
+        Send(handShake.Serialize());
     }
 
     public void Close()
@@ -49,7 +54,7 @@ public class UdpConnection
             {
                 DataReceived dataReceived = dataReceivedQueue.Dequeue();
                 if (receiver != null)
-                    receiver.OnReceiveData(dataReceived.data, dataReceived.ipEndPoint);
+                    receiver.OnReceiveData(dataReceived.data, dataReceived.ipEndPoint, playerId, nameTag);
             }
         }
     }
@@ -66,7 +71,7 @@ public class UdpConnection
                 dataReceivedQueue.Enqueue(dataReceived);
             }
         }
-        catch(SocketException e)
+        catch (SocketException e)
         {
             // This happens when a client disconnects, as we fail to send to that port.
             UnityEngine.Debug.LogError("[UdpConnection] " + e.Message);

@@ -15,9 +15,12 @@ public class ChatScreen : MonoBehaviourSingleton<ChatScreen>
         this.gameObject.SetActive(false);
     }
 
-    public void ReceiveConsoleMessage(string consoleMessage)
+    public void ReceiveConsoleMessage(string consoleMessage, int id)
     {
-        messages.text += consoleMessage + System.Environment.NewLine;
+        if (id != NetworkManager.Instance.serverId)
+            messages.text += NetworkManager.Instance.GetPlayer(id).playerName + ": " + consoleMessage + System.Environment.NewLine;
+        else
+            messages.text += "Server" + ": " + consoleMessage + System.Environment.NewLine;
     }
 
     void OnEndEdit(string str)
@@ -28,8 +31,8 @@ public class ChatScreen : MonoBehaviourSingleton<ChatScreen>
 
             if (NetworkManager.Instance.isServer)
             {
+                ReceiveConsoleMessage(inputMessage.text, NetworkManager.Instance.serverId);
                 NetworkManager.Instance.Broadcast(netConsoleMessage.Serialize());
-                messages.text += inputMessage.text + System.Environment.NewLine;
             }
             else
             {

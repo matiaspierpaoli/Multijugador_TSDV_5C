@@ -1,57 +1,27 @@
+using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using UnityEngine;
 
-public class MessageHandler : MonoBehaviour
+public class MessageHandler : MonoBehaviourSingleton<MessageHandler>
 {
-    private void OnEnable()
+    public ChatScreen chat;
+
+    protected override void Initialize()
     {
         NetworkManager.Instance.OnReceiveEvent += OnReceiveDataEvent;
     }
 
-    private void OnDisable()
+    private void OnReceiveDataEvent(byte[] data, IPEndPoint ep, int id)
     {
-        NetworkManager.Instance.OnReceiveEvent -= OnReceiveDataEvent;
-    }
-
-    private void OnReceiveDataEvent(byte[] data, IPEndPoint ep)
-    {
-
         if (NetworkManager.Instance.isServer)
-            HandleServerMessage(data, ep);
+            HandleServerMessage(data, ep, id);
         else
             HandleMessage(data);
     }
 
-    public void HandleMessage(byte[] message)
-    {
-        MemoryStream memStream = new MemoryStream(message);
-        BinaryReader reader = new BinaryReader(memStream);
-            
-        MessageType temp = (MessageType)reader.ReadInt32();
-
-        switch (temp)
-        {
-            case MessageType.HandShake:
-                NetHandShake nethandShake = new NetHandShake();
-                nethandShake.Deserialize(message);
-                if (nethandShake.IsClientIdAssigned())
-                {
-                    NetworkManager.Instance.clientId = nethandShake.GetData();
-                    Debug.Log("client ID = " + NetworkManager.Instance.clientId);
-                }
-                break;
-            case MessageType.Console:
-                NetConsole con = new NetConsole(message);
-                NetConsole.OnDispatch?.Invoke(con.GetData());
-                break;
-            case MessageType.Position:
-                //NetVector3.OnDispatch?.Invoke();
-                break;
-        }
-    }
-
-    public void HandleServerMessage(byte[] data, IPEndPoint ip)
+    public void HandleMessage(byte[] data)
     {
         MemoryStream memStream = new MemoryStream(data);
         BinaryReader reader = new BinaryReader(memStream);
@@ -60,21 +30,52 @@ public class MessageHandler : MonoBehaviour
 
         switch (temp)
         {
-            case MessageType.HandShake:
-                NetHandShake nethandShake = new NetHandShake();
-                nethandShake.SetClientID(NetworkManager.Instance.AddClient(ip));
-                NetworkManager.Instance.SendToClient(nethandShake.Serialize(), ip);
+            case MessageType.ServerToClientHandshake:
+                ServerToClientHS serverToClientHS = new ServerToClientHS();
+                List<Player> players = serverToClientHS.Deserialize(data);
+                NetworkManager.Instance.SetPlayer(players);
+                Debug.Log("IP: " + NetworkManager.Instance.clientId);
+                break;
+            case MessageType.ClientToServerHandshake:
                 break;
             case MessageType.Console:
-                NetConsole netConsole = new NetConsole(data);
-                NetworkManager.Instance.Broadcast(netConsole.Serialize());
-                ChatScreen.Instance.ReceiveConsoleMessage(netConsole.GetData());
+                NetConsole consoleMessage = new();
+                int playerId = BitConverter.ToInt32(data, 4);
+                Debug.Log(playerId);
+                chat.ReceiveConsoleMessage(consoleMessage.Deserialize(data), playerId);
+                break;
+            case MessageType.Position:
+                //NetVector3.OnDispatch?.Invoke();
+                break;
+        }
+    }
+
+    public void HandleServerMessage(byte[] data, IPEndPoint ep, int id)
+    {
+        MemoryStream memStream = new MemoryStream(data);
+        BinaryReader reader = new BinaryReader(memStream);
+            
+        MessageType temp = (MessageType)reader.ReadInt32();
+
+        switch (temp)
+        {
+            case MessageType.ClientToServerHandshake:
+                ClientToServerHS clientToServerHS = new ClientToServerHS();
+                string gameTag = clientToServerHS.Deserialize(data);
+                Debug.Log("Client ip: " + ep.Address + " and nametag: " + gameTag);
+                NetworkManager.Instance.RegisterClient(ep, out id, gameTag);
+                ServerToClientHS handOK = new ServerToClientHS(NetworkManager.Instance.PlayerList);
+                NetworkManager.Instance.Broadcast(handOK.Serialize());
+                break;
+            case MessageType.ServerToClientHandshake:
+                break;
+            case MessageType.Console:
+                NetConsole consoleMessage = new();
+                chat.ReceiveConsoleMessage(consoleMessage.Deserialize(data), BitConverter.ToInt32(data, 4));
+                NetworkManager.Instance.Broadcast(data);
                 break;
             case MessageType.Position:
                 break;
         }
-            
-        
     }
-
 }
